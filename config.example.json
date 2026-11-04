@@ -1,0 +1,10 @@
+{
+  "proxyHost": "127.0.0.1",
+  "proxyPort": 7890,
+  "targetTimeZone": "America/New_York",
+  "regionDisplayName": "纽约",
+  "tzLauncherPath": "~/Applications/Claude Timezone Launcher.app/Contents/MacOS/launcher",
+  "firewallCheckScript": "",
+  "requireFirewallCheck": false,
+  "firewallDisplayName": "本地防火墙"
+}

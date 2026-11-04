@@ -1,0 +1,9 @@
+.DS_Store
+build/
+*.app/
+*.dSYM/
+*.xcuserdata/
+.swiftpm/
+switcher-config.json
+menubar-prefs.json
+*.local.json

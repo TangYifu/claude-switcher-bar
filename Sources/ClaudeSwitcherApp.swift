@@ -1,6 +1,276 @@
 import AppKit
+import CoreText
 import Foundation
 import SwiftUI
+
+// MARK: - Anthropic Design System (Colors, Typography & Vector Emblem)
+
+enum AnthropicFont {
+    private static let registered: Bool = {
+        let candidateDirs = [
+            Bundle.main.resourceURL?.appendingPathComponent("fonts").path,
+            "/Applications/Claude.app/Contents/Resources/fonts"
+        ].compactMap { $0 }
+
+        let fontFiles = [
+            "AnthropicSerif-Romans-Variable-25x258.ttf",
+            "AnthropicSerif-Italics-Variable-25x258.ttf",
+            "AnthropicSans-Romans-Variable-25x258.ttf",
+            "AnthropicSans-Italics-Variable-25x258.ttf"
+        ]
+
+        for dir in candidateDirs {
+            for file in fontFiles {
+                let path = "\(dir)/\(file)"
+                if FileManager.default.fileExists(atPath: path) {
+                    let url = URL(fileURLWithPath: path) as CFURL
+                    CTFontManagerRegisterFontsForURL(url, .process, nil)
+                }
+            }
+        }
+        return true
+    }()
+
+    static func serif(size: CGFloat, weight: Font.Weight = .semibold) -> Font {
+        _ = registered
+        let psName: String
+        switch weight {
+        case .bold, .heavy, .black:
+            psName = "AnthropicSerifVariable-DisplayBold"
+        case .semibold:
+            psName = "AnthropicSerifVariable-DisplaySemibold"
+        case .medium:
+            psName = "AnthropicSerifVariable-DisplayMedium"
+        default:
+            psName = "AnthropicSerifVariable-DisplayRegular"
+        }
+        if NSFont(name: psName, size: size) != nil {
+            return .custom(psName, size: size)
+        }
+        return .system(size: size, weight: weight, design: .serif)
+    }
+
+    static func sans(size: CGFloat, weight: Font.Weight = .regular) -> Font {
+        _ = registered
+        let psName: String
+        switch weight {
+        case .bold, .heavy, .black:
+            psName = "AnthropicSansVariable-TextBold"
+        case .semibold:
+            psName = "AnthropicSansVariable-TextSemibold"
+        case .medium:
+            psName = "AnthropicSansVariable-TextMedium"
+        default:
+            psName = "AnthropicSansVariable-TextRegular"
+        }
+        if NSFont(name: psName, size: size) != nil {
+            return .custom(psName, size: size)
+        }
+        return .system(size: size, weight: weight, design: .default)
+    }
+
+    static func mono(size: CGFloat, weight: Font.Weight = .medium) -> Font {
+        .system(size: size, weight: weight, design: .monospaced)
+    }
+}
+
+enum AnthropicTheme {
+    private static func dynamicColor(
+        light: (CGFloat, CGFloat, CGFloat, CGFloat),
+        dark: (CGFloat, CGFloat, CGFloat, CGFloat)
+    ) -> Color {
+        Color(nsColor: dynamicNSColor(light: light, dark: dark))
+    }
+
+    static func dynamicNSColor(
+        light: (CGFloat, CGFloat, CGFloat, CGFloat),
+        dark: (CGFloat, CGFloat, CGFloat, CGFloat)
+    ) -> NSColor {
+        NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            let c = isDark ? dark : light
+            return NSColor(srgbRed: c.0, green: c.1, blue: c.2, alpha: c.3)
+        }
+    }
+
+    // Official Claude Desktop (`cds-root`) Warm Surfaces
+    // Light: Pampas Parchment (#FAF9F5) / Dark: Warm Coal (#1F1E1D)
+    static let canvasBackground = dynamicColor(
+        light: (0.980, 0.976, 0.961, 1.0),
+        dark:  (0.122, 0.118, 0.114, 1.0)
+    )
+
+    // Light: Warm Paper (#FFFFFF) / Dark: Warm Graphite (#262624)
+    static let cardSurface = dynamicColor(
+        light: (1.000, 0.998, 0.992, 1.0),
+        dark:  (0.149, 0.149, 0.141, 1.0)
+    )
+
+    // Light: Crisp White (#FFFFFF) / Dark: Elevated Slate (#2C2B28)
+    static let cardElevatedSurface = dynamicColor(
+        light: (1.000, 1.000, 1.000, 1.0),
+        dark:  (0.173, 0.169, 0.157, 1.0)
+    )
+
+    // Light: Warm Oat Well (#F3F1E9) / Dark: Recessed Charcoal (#191817)
+    static let recessedSurface = dynamicColor(
+        light: (0.953, 0.945, 0.914, 1.0),
+        dark:  (0.098, 0.094, 0.090, 1.0)
+    )
+
+    // Interactive Secondary Controls
+    static let controlFill = dynamicColor(
+        light: (0.937, 0.929, 0.898, 1.0),
+        dark:  (0.192, 0.188, 0.176, 1.0)
+    )
+
+    static let controlHoverFill = dynamicColor(
+        light: (0.902, 0.890, 0.855, 1.0),
+        dark:  (0.235, 0.231, 0.216, 1.0)
+    )
+
+    // Warm Stone Hairline Borders (`--border-100`)
+    static let borderSubtle = dynamicColor(
+        light: (0.122, 0.118, 0.114, 0.09),
+        dark:  (0.871, 0.863, 0.820, 0.09)
+    )
+
+    static let borderStrong = dynamicColor(
+        light: (0.122, 0.118, 0.114, 0.16),
+        dark:  (0.871, 0.863, 0.820, 0.17)
+    )
+
+    // Editorial Ink Hierarchy (`--text-100`, `--text-200`, `--text-400`)
+    static let inkPrimary = dynamicColor(
+        light: (0.078, 0.078, 0.075, 1.0), // #141413
+        dark:  (0.980, 0.976, 0.961, 1.0)  // #FAF9F5
+    )
+
+    static let inkSecondary = dynamicColor(
+        light: (0.243, 0.239, 0.227, 1.0), // #3E3D3A
+        dark:  (0.761, 0.753, 0.714, 1.0)  // #C2C0B6
+    )
+
+    static let inkMuted = dynamicColor(
+        light: (0.451, 0.447, 0.424, 1.0), // #73726C
+        dark:  (0.612, 0.604, 0.573, 1.0)  // #9C9A92
+    )
+
+    // Signature Anthropic Pigments
+    // Terracotta Clay (`#D97757` / `#C6613F`)
+    static let terracotta = Color(red: 0.851, green: 0.467, blue: 0.341)
+    static let terracottaDeep = Color(red: 0.776, green: 0.380, blue: 0.247)
+    static let nsTerracotta = NSColor(srgbRed: 0.851, green: 0.467, blue: 0.341, alpha: 1.0)
+
+    // Warm Book-Cloth Umber & Parchment — Secondary Editorial Account Identity
+    static let sandstone = dynamicColor(
+        light: (0.235, 0.227, 0.212, 1.0), // #3C3A36 Warm Book-Cloth Charcoal
+        dark:  (0.835, 0.788, 0.718, 1.0)  // #D5C9B7 Warm Parchment Sand
+    )
+    static let sandstoneDeep = Color(red: 0.165, green: 0.161, blue: 0.149)
+    static let nsSandstone = dynamicNSColor(
+        light: (0.235, 0.227, 0.212, 1.0),
+        dark:  (0.835, 0.788, 0.718, 1.0)
+    )
+
+    static let pro2BadgeTop = dynamicColor(
+        light: (0.255, 0.247, 0.231, 1.0),
+        dark:  (0.275, 0.263, 0.243, 1.0)
+    )
+    static let pro2BadgeBottom = dynamicColor(
+        light: (0.165, 0.161, 0.149, 1.0),
+        dark:  (0.196, 0.188, 0.173, 1.0)
+    )
+
+    // Botanical Sage (`--success-000` / `--success-100`)
+    static let sage = dynamicColor(
+        light: (0.220, 0.510, 0.255, 1.0),
+        dark:  (0.435, 0.725, 0.447, 1.0)
+    )
+    static let sageFill = dynamicColor(
+        light: (0.220, 0.510, 0.255, 0.11),
+        dark:  (0.435, 0.725, 0.447, 0.14)
+    )
+    static let sageBorder = dynamicColor(
+        light: (0.220, 0.510, 0.255, 0.26),
+        dark:  (0.435, 0.725, 0.447, 0.28)
+    )
+
+    // Crimson Danger (`--danger-100`)
+    static let danger = dynamicColor(
+        light: (0.710, 0.200, 0.200, 1.0),
+        dark:  (0.871, 0.345, 0.322, 1.0)
+    )
+    static let dangerFill = dynamicColor(
+        light: (0.710, 0.200, 0.200, 0.10),
+        dark:  (0.871, 0.345, 0.322, 0.14)
+    )
+    static let dangerBorder = dynamicColor(
+        light: (0.710, 0.200, 0.200, 0.32),
+        dark:  (0.871, 0.345, 0.322, 0.38)
+    )
+}
+
+struct ClaudeStarburstShape: Shape {
+    // Official 24x24 Claude Starburst polygon coordinates
+    static let vertices: [(CGFloat, CGFloat)] = [
+        (4.709, 15.955), (9.429, 13.308), (9.509, 13.078), (9.429, 12.95), (9.2, 12.95), (8.41, 12.902),
+        (5.712, 12.829), (3.373, 12.732), (1.107, 12.61), (0.536, 12.489), (0.0, 11.784), (0.055, 11.432),
+        (0.535, 11.111), (1.221, 11.171), (2.741, 11.274), (5.019, 11.432), (6.671, 11.529), (9.12, 11.784),
+        (9.509, 11.784), (9.564, 11.627), (9.43, 11.529), (9.327, 11.432), (6.969, 9.836), (4.417, 8.148),
+        (3.081, 7.176), (2.357, 6.685), (1.993, 6.223), (1.835, 5.215), (2.491, 4.493), (3.372, 4.553),
+        (3.597, 4.614), (4.49, 5.3), (6.398, 6.776), (8.889, 8.609), (9.254, 8.913), (9.399, 8.81),
+        (9.418, 8.737), (9.254, 8.463), (7.899, 6.017), (6.453, 3.527), (5.809, 2.495), (5.639, 1.876),
+        (5.535, 1.147), (6.283, 0.134), (6.696, 0.0), (7.692, 0.134), (8.112, 0.498), (8.732, 1.912),
+        (9.734, 4.141), (11.289, 7.171), (11.745, 8.069), (11.988, 8.901), (12.079, 9.156), (12.237, 9.156),
+        (12.237, 9.01), (12.365, 7.304), (12.602, 5.209), (12.832, 2.514), (12.912, 1.754), (13.288, 0.844),
+        (14.035, 0.352), (14.619, 0.632), (15.099, 1.317), (15.032, 1.761), (14.746, 3.612), (14.187, 6.515),
+        (13.823, 8.457), (14.035, 8.457), (14.278, 8.215), (15.263, 6.909), (16.915, 4.845), (17.645, 4.025),
+        (18.495, 3.121), (19.042, 2.69), (20.075, 2.69), (20.835, 3.819), (20.495, 4.985), (19.431, 6.332),
+        (18.55, 7.474), (17.286, 9.174), (16.496, 10.534), (16.569, 10.644), (16.757, 10.624), (19.613, 10.018),
+        (21.156, 9.738), (22.997, 9.423), (23.83, 9.811), (23.921, 10.206), (23.593, 11.013), (21.624, 11.499),
+        (19.315, 11.961), (15.876, 12.774), (15.834, 12.804), (15.883, 12.865), (17.432, 13.011), (18.094, 13.047),
+        (19.716, 13.047), (22.736, 13.272), (23.526, 13.794), (24.0, 14.432), (23.921, 14.917), (22.706, 15.537),
+        (21.066, 15.148), (17.237, 14.238), (15.925, 13.909), (15.743, 13.909), (15.743, 14.019), (16.836, 15.087),
+        (18.842, 16.897), (21.351, 19.227), (21.478, 19.805), (21.156, 20.26), (20.816, 20.211), (18.611, 18.554),
+        (17.76, 17.807), (15.834, 16.187), (15.706, 16.187), (15.706, 16.357), (16.15, 17.006), (18.495, 20.527),
+        (18.617, 21.607), (18.447, 21.96), (17.839, 22.173), (17.171, 22.051), (15.797, 20.126), (14.382, 17.959),
+        (13.239, 16.016), (13.099, 16.096), (12.425, 23.35), (12.109, 23.72), (11.38, 24.0), (10.773, 23.539),
+        (10.451, 22.792), (10.773, 21.316), (11.162, 19.392), (11.477, 17.862), (11.763, 15.962), (11.933, 15.33),
+        (11.921, 15.288), (11.781, 15.306), (10.347, 17.273), (8.167, 20.218), (6.441, 22.063), (6.027, 22.227),
+        (5.31, 21.857), (5.377, 21.195), (5.778, 20.606), (8.166, 17.57), (9.606, 15.688), (10.536, 14.602),
+        (10.53, 14.444), (10.475, 14.444), (4.132, 18.56), (3.002, 18.706), (2.515, 18.25), (2.576, 17.504),
+        (2.807, 17.261), (4.715, 15.949), (4.709, 15.955)
+    ]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard let first = Self.vertices.first else { return path }
+        let sx = rect.width / 24.0
+        let sy = rect.height / 24.0
+        path.move(to: CGPoint(x: rect.minX + first.0 * sx, y: rect.minY + first.1 * sy))
+        for pt in Self.vertices.dropFirst() {
+            path.addLine(to: CGPoint(x: rect.minX + pt.0 * sx, y: rect.minY + pt.1 * sy))
+        }
+        path.closeSubpath()
+        return path
+    }
+
+    static func drawInAppKit(rect: NSRect, color: NSColor) {
+        guard let first = vertices.first else { return }
+        let bezier = NSBezierPath()
+        let sx = rect.width / 24.0
+        let sy = rect.height / 24.0
+        // AppKit NSImage(flipped: false) has origin at bottom-left, while SVG has origin at top-left
+        bezier.move(to: NSPoint(x: rect.minX + first.0 * sx, y: rect.maxY - first.1 * sy))
+        for pt in vertices.dropFirst() {
+            bezier.line(to: NSPoint(x: rect.minX + pt.0 * sx, y: rect.maxY - pt.1 * sy))
+        }
+        bezier.close()
+        color.setFill()
+        bezier.fill()
+    }
+}
 
 // MARK: - Externalized Environment Configuration & Models
 
@@ -69,21 +339,38 @@ enum AccountID: String, CaseIterable, Codable, Identifiable {
 
     var accentColor: Color {
         switch self {
-        case .pro1: return Color(red: 0.18, green: 0.42, blue: 0.96)
-        case .pro2: return Color(red: 0.04, green: 0.64, blue: 0.46)
+        case .pro1: return AnthropicTheme.terracotta
+        case .pro2: return AnthropicTheme.sandstone
         }
     }
 
     var secondaryAccentColor: Color {
         switch self {
-        case .pro1: return Color(red: 0.34, green: 0.30, blue: 0.92)
-        case .pro2: return Color(red: 0.05, green: 0.56, blue: 0.58)
+        case .pro1: return AnthropicTheme.terracottaDeep
+        case .pro2: return AnthropicTheme.sandstoneDeep
         }
     }
 
     var badgeGradient: LinearGradient {
+        switch self {
+        case .pro1:
+            return LinearGradient(
+                colors: [AnthropicTheme.terracotta, AnthropicTheme.terracottaDeep],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        case .pro2:
+            return LinearGradient(
+                colors: [AnthropicTheme.pro2BadgeTop, AnthropicTheme.pro2BadgeBottom],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+
+    var primaryButtonGradient: LinearGradient {
         LinearGradient(
-            colors: [accentColor, secondaryAccentColor],
+            colors: [AnthropicTheme.terracotta, AnthropicTheme.terracottaDeep],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -91,8 +378,8 @@ enum AccountID: String, CaseIterable, Codable, Identifiable {
 
     var nsAccentColor: NSColor {
         switch self {
-        case .pro1: return NSColor(calibratedRed: 0.18, green: 0.42, blue: 0.96, alpha: 1.0)
-        case .pro2: return NSColor(calibratedRed: 0.04, green: 0.64, blue: 0.46, alpha: 1.0)
+        case .pro1: return AnthropicTheme.nsTerracotta
+        case .pro2: return AnthropicTheme.nsSandstone
         }
     }
 }
@@ -802,7 +1089,7 @@ final class SwitcherStore: ObservableObject {
     }
 }
 
-// MARK: - Tactile Interactive Button Components
+// MARK: - Tactile Interactive Button Components (Anthropic Design System)
 
 struct PrimaryCapsuleButton: View {
     let title: String
@@ -816,31 +1103,31 @@ struct PrimaryCapsuleButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: 5.5) {
                 Image(systemName: icon)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 10.5, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(AnthropicFont.sans(size: 12, weight: .semibold))
                     .lineLimit(1)
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(Color(red: 0.980, green: 0.976, blue: 0.961))
             .frame(maxWidth: .infinity)
             .frame(height: 30)
             .padding(.horizontal, 10)
             .background(
-                RoundedRectangle(cornerRadius: 8.5, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(gradient)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8.5, style: .continuous)
-                            .fill(Color.white.opacity(isHovered ? 0.12 : 0.0))
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.black.opacity(isHovered ? 0.08 : 0.0))
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8.5, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.8)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .strokeBorder(Color.white.opacity(isHovered ? 0.24 : 0.15), lineWidth: 0.75)
                     )
-                    .shadow(color: accent.opacity(isHovered ? 0.34 : 0.18), radius: isHovered ? 7 : 4, x: 0, y: 2)
+                    .shadow(color: Color.black.opacity(isHovered ? 0.18 : 0.10), radius: isHovered ? 4 : 2, x: 0, y: 1)
             )
-            .opacity(disabled ? 0.55 : 1.0)
+            .opacity(disabled ? 0.52 : 1.0)
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -867,33 +1154,37 @@ struct SecondaryPillButton: View {
             HStack(spacing: 4) {
                 if let icon = icon {
                     Image(systemName: icon)
-                        .font(.system(size: 10.5, weight: .medium))
+                        .font(.system(size: 10, weight: .medium))
                 }
                 Text(title)
-                    .font(.system(size: 11.5, weight: .medium))
+                    .font(AnthropicFont.sans(size: 11.5, weight: .medium))
                     .lineLimit(1)
             }
-            .foregroundStyle(isDestructive && isHovered ? Color.red : Color.primary.opacity(0.88))
+            .foregroundStyle(
+                isDestructive && isHovered
+                    ? AnthropicTheme.danger
+                    : (isHovered ? AnthropicTheme.inkPrimary : AnthropicTheme.inkSecondary)
+            )
             .frame(height: 30)
-            .padding(.horizontal, 9)
+            .padding(.horizontal, 9.5)
             .background(
-                RoundedRectangle(cornerRadius: 8.5, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(
                         isDestructive && isHovered
-                            ? Color.red.opacity(0.12)
-                            : Color.primary.opacity(isHovered ? 0.10 : 0.055)
+                            ? AnthropicTheme.dangerFill
+                            : (isHovered ? AnthropicTheme.controlHoverFill : AnthropicTheme.controlFill)
                     )
                     .overlay(
-                        RoundedRectangle(cornerRadius: 8.5, style: .continuous)
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .strokeBorder(
                                 isDestructive && isHovered
-                                    ? Color.red.opacity(0.35)
-                                    : Color.primary.opacity(isHovered ? 0.16 : 0.09),
-                                lineWidth: 0.8
+                                    ? AnthropicTheme.dangerBorder
+                                    : (isHovered ? AnthropicTheme.borderStrong : AnthropicTheme.borderSubtle),
+                                lineWidth: 0.75
                             )
                     )
             )
-            .opacity(disabled ? 0.5 : 1.0)
+            .opacity(disabled ? 0.48 : 1.0)
         }
         .buttonStyle(.plain)
         .disabled(disabled)
@@ -916,17 +1207,18 @@ struct SwitcherPopoverView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            RadialGradient(
+            AnthropicTheme.canvasBackground
+
+            // Subtle warm terracotta paper wash along top edge
+            LinearGradient(
                 colors: [
-                    store.ambientAccentColor.opacity(0.16),
-                    store.ambientAccentColor.opacity(0.04),
+                    (store.allGuardsHealthy ? AnthropicTheme.terracotta : AnthropicTheme.danger).opacity(0.06),
                     Color.clear
                 ],
-                center: .top,
-                startRadius: 8,
-                endRadius: 210
+                startPoint: .top,
+                endPoint: .bottom
             )
-            .frame(height: 185)
+            .frame(height: 110)
             .allowsHitTesting(false)
 
             VStack(alignment: .leading, spacing: 11) {
@@ -947,7 +1239,7 @@ struct SwitcherPopoverView: View {
             }
             .padding(14)
         }
-        .frame(width: 386)
+        .frame(width: 406)
         .onAppear {
             store.setPopoverVisible(true)
         }
@@ -961,76 +1253,98 @@ struct SwitcherPopoverView: View {
     private var securityCockpitCard: some View {
         let healthy = store.allGuardsHealthy
         let cfg = store.envConfig
-        let shieldColors: [Color] = healthy
-            ? [Color(red: 0.06, green: 0.72, blue: 0.50), Color(red: 0.04, green: 0.52, blue: 0.44)]
-            : [Color(red: 0.94, green: 0.27, blue: 0.27), Color(red: 0.78, green: 0.16, blue: 0.22)]
 
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+            HStack(alignment: .center, spacing: 10.5) {
+                ZStack(alignment: .bottomTrailing) {
+                    RoundedRectangle(cornerRadius: 9.5, style: .continuous)
                         .fill(
-                            LinearGradient(
-                                colors: shieldColors,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                            healthy
+                                ? AnthropicTheme.terracotta.opacity(0.14)
+                                : AnthropicTheme.dangerFill
                         )
-                        .frame(width: 34, height: 34)
-                        .shadow(color: shieldColors[0].opacity(0.28), radius: 5, x: 0, y: 2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 9.5, style: .continuous)
+                                .strokeBorder(
+                                    healthy
+                                        ? AnthropicTheme.terracotta.opacity(0.32)
+                                        : AnthropicTheme.dangerBorder,
+                                    lineWidth: 0.85
+                                )
+                        )
+                        .frame(width: 35, height: 35)
 
-                    Image(systemName: healthy ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
+                    ClaudeStarburstShape()
+                        .fill(healthy ? AnthropicTheme.terracotta : AnthropicTheme.danger)
+                        .frame(width: 18.5, height: 18.5)
+                        .frame(width: 35, height: 35)
+
+                    Circle()
+                        .fill(healthy ? AnthropicTheme.sage : AnthropicTheme.danger)
+                        .frame(width: 8.5, height: 8.5)
+                        .overlay(
+                            Circle()
+                                .strokeBorder(AnthropicTheme.cardSurface, lineWidth: 1.5)
+                        )
+                        .offset(x: 2, y: 2)
                 }
 
                 VStack(alignment: .leading, spacing: 2.5) {
                     HStack(spacing: 6) {
                         Text(healthy ? "\(cfg.regionDisplayName)安全环境舱" : "安全防护异常拦截")
-                            .font(.system(size: 13.5, weight: .bold))
-                            .foregroundStyle(.primary)
+                            .font(AnthropicFont.serif(size: 14.5, weight: .semibold))
+                            .foregroundStyle(AnthropicTheme.inkPrimary)
 
                         Text(healthy ? "已锁定" : "阻断中")
-                            .font(.system(size: 9.5, weight: .bold))
-                            .foregroundStyle(healthy ? Color(red: 0.05, green: 0.65, blue: 0.45) : Color.red)
-                            .padding(.horizontal, 5.5)
+                            .font(AnthropicFont.sans(size: 9.5, weight: .semibold))
+                            .foregroundStyle(healthy ? AnthropicTheme.sage : AnthropicTheme.danger)
+                            .padding(.horizontal, 6)
                             .padding(.vertical, 1.5)
                             .background(
                                 Capsule()
-                                    .fill(healthy ? Color.green.opacity(0.14) : Color.red.opacity(0.15))
+                                    .fill(healthy ? AnthropicTheme.sageFill : AnthropicTheme.dangerFill)
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(
+                                                healthy ? AnthropicTheme.sageBorder : AnthropicTheme.dangerBorder,
+                                                lineWidth: 0.7
+                                            )
+                                    )
                             )
                     }
 
                     Text("\(cfg.targetTimeZone) · Claude 强制纯英隔离")
-                        .font(.system(size: 10.5, weight: .regular))
-                        .foregroundStyle(.secondary)
+                        .font(AnthropicFont.sans(size: 10, weight: .regular))
+                        .foregroundStyle(AnthropicTheme.inkMuted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
                 }
 
                 Spacer(minLength: 4)
 
                 VStack(alignment: .trailing, spacing: 1.5) {
                     Text(store.targetClockDigits)
-                        .font(.system(size: 15.5, weight: .bold, design: .monospaced))
+                        .font(AnthropicFont.mono(size: 15, weight: .semibold))
                         .monospacedDigit()
-                        .foregroundStyle(.primary)
+                        .foregroundStyle(AnthropicTheme.inkPrimary)
 
                     HStack(spacing: 4) {
                         Text(cfg.regionDisplayName)
-                            .font(.system(size: 9.5, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .font(AnthropicFont.sans(size: 9.5, weight: .medium))
+                            .foregroundStyle(AnthropicTheme.inkMuted)
                         Text(store.targetZoneAbbrev)
-                            .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .font(AnthropicFont.mono(size: 9.5, weight: .semibold))
+                            .foregroundStyle(AnthropicTheme.terracotta)
                     }
                 }
                 .padding(.horizontal, 8.5)
                 .padding(.vertical, 4.5)
                 .background(
-                    RoundedRectangle(cornerRadius: 8.5, style: .continuous)
-                        .fill(Color.primary.opacity(0.05))
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(AnthropicTheme.recessedSurface)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 8.5, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.8)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(AnthropicTheme.borderSubtle, lineWidth: 0.75)
                         )
                 )
             }
@@ -1059,19 +1373,19 @@ struct SwitcherPopoverView: View {
                 HStack(spacing: 7) {
                     Image(systemName: store.exitIPResult == nil ? "globe.americas.fill" : "checkmark.seal.fill")
                         .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(store.exitIPResult == nil ? Color.secondary : Color(red: 0.05, green: 0.65, blue: 0.45))
+                        .foregroundStyle(store.exitIPResult == nil ? AnthropicTheme.terracotta : AnthropicTheme.sage)
 
                     if let ipInfo = store.exitIPResult {
                         Text("出口 IP: \(ipInfo.ip)")
-                            .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                            .foregroundStyle(.primary)
+                            .font(AnthropicFont.mono(size: 11, weight: .semibold))
+                            .foregroundStyle(AnthropicTheme.inkPrimary)
                         Text("· \(ipInfo.country) / \(ipInfo.colo)")
-                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .font(AnthropicFont.mono(size: 10.5, weight: .medium))
+                            .foregroundStyle(AnthropicTheme.inkMuted)
                     } else {
                         Text("点击校验 \(cfg.proxyEndpointString) 代理出口 IP")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .font(AnthropicFont.sans(size: 11, weight: .medium))
+                            .foregroundStyle(AnthropicTheme.inkSecondary)
                     }
 
                     Spacer()
@@ -1080,23 +1394,26 @@ struct SwitcherPopoverView: View {
                         ProgressView()
                             .controlSize(.mini)
                     } else {
-                        HStack(spacing: 3) {
+                        HStack(spacing: 3.5) {
                             Text(store.exitIPResult == nil ? "立即检测" : "重新检测")
-                                .font(.system(size: 10.5, weight: .semibold))
+                                .font(AnthropicFont.sans(size: 10.5, weight: .semibold))
                             Image(systemName: "arrow.clockwise")
                                 .font(.system(size: 9.5, weight: .semibold))
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(ipRowHovered ? AnthropicTheme.terracotta : AnthropicTheme.inkMuted)
                     }
                 }
                 .padding(.horizontal, 9.5)
-                .padding(.vertical, 6)
+                .padding(.vertical, 6.5)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.primary.opacity(ipRowHovered ? 0.075 : 0.04))
+                        .fill(ipRowHovered ? AnthropicTheme.controlFill : AnthropicTheme.recessedSurface)
                         .overlay(
                             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(Color.primary.opacity(ipRowHovered ? 0.13 : 0.06), lineWidth: 0.8)
+                                .strokeBorder(
+                                    ipRowHovered ? AnthropicTheme.borderStrong : AnthropicTheme.borderSubtle,
+                                    lineWidth: 0.75
+                                )
                         )
                 )
             }
@@ -1109,45 +1426,47 @@ struct SwitcherPopoverView: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(Color.primary.opacity(0.038))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(AnthropicTheme.cardSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .strokeBorder(
-                            healthy ? Color.primary.opacity(0.09) : Color.red.opacity(0.45),
-                            lineWidth: healthy ? 1.0 : 1.3
+                            healthy ? AnthropicTheme.borderSubtle : AnthropicTheme.dangerBorder,
+                            lineWidth: healthy ? 0.85 : 1.2
                         )
                 )
         )
     }
 
     private func telemetryTile(ok: Bool, title: String, detail: String) -> some View {
-        HStack(spacing: 5.5) {
+        HStack(spacing: 6) {
             Circle()
-                .fill(ok ? Color(red: 0.08, green: 0.75, blue: 0.48) : Color.red)
-                .frame(width: 6.5, height: 6.5)
-                .shadow(color: (ok ? Color.green : Color.red).opacity(0.45), radius: 2.5)
+                .fill(ok ? AnthropicTheme.sage : AnthropicTheme.danger)
+                .frame(width: 6, height: 6)
 
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 1.5) {
                 Text(title)
-                    .font(.system(size: 9.5, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(AnthropicFont.sans(size: 9.5, weight: .medium))
+                    .foregroundStyle(AnthropicTheme.inkMuted)
                 Text(detail)
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(ok ? Color.primary : Color.red)
+                    .font(AnthropicFont.sans(size: 10.5, weight: .semibold))
+                    .foregroundStyle(ok ? AnthropicTheme.inkPrimary : AnthropicTheme.danger)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5.5)
+        .padding(.horizontal, 8.5)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(ok ? Color.primary.opacity(0.038) : Color.red.opacity(0.10))
+                .fill(ok ? AnthropicTheme.recessedSurface : AnthropicTheme.dangerFill)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(ok ? Color.primary.opacity(0.06) : Color.red.opacity(0.28), lineWidth: 0.8)
+                        .strokeBorder(
+                            ok ? AnthropicTheme.borderSubtle : AnthropicTheme.dangerBorder,
+                            lineWidth: 0.75
+                        )
                 )
         )
     }
@@ -1155,28 +1474,28 @@ struct SwitcherPopoverView: View {
     // MARK: 3. Toast & Footer
 
     private func bannerToast(_ item: BannerMessage) -> some View {
-        HStack(spacing: 7) {
+        HStack(spacing: 7.5) {
             Image(systemName: item.isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(item.isError ? Color.red : Color(red: 0.06, green: 0.70, blue: 0.46))
+                .foregroundStyle(item.isError ? AnthropicTheme.danger : AnthropicTheme.terracotta)
 
             Text(item.text)
-                .font(.system(size: 11.5, weight: .medium))
-                .foregroundStyle(.primary)
+                .font(AnthropicFont.sans(size: 11.5, weight: .medium))
+                .foregroundStyle(AnthropicTheme.inkPrimary)
                 .lineLimit(2)
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 7.5)
+        .padding(.horizontal, 10.5)
+        .padding(.vertical, 8)
         .background(
             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(item.isError ? Color.red.opacity(0.11) : Color.primary.opacity(0.06))
+                .fill(item.isError ? AnthropicTheme.dangerFill : AnthropicTheme.cardElevatedSurface)
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .strokeBorder(
-                            item.isError ? Color.red.opacity(0.30) : Color.primary.opacity(0.10),
-                            lineWidth: 0.8
+                            item.isError ? AnthropicTheme.dangerBorder : AnthropicTheme.terracotta.opacity(0.35),
+                            lineWidth: 0.85
                         )
                 )
         )
@@ -1189,15 +1508,16 @@ struct SwitcherPopoverView: View {
                 set: { store.toggleLaunchAtLogin($0) }
             )) {
                 Text("开机自启")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .font(AnthropicFont.sans(size: 11.5, weight: .medium))
+                    .foregroundStyle(AnthropicTheme.inkSecondary)
             }
             .toggleStyle(.switch)
+            .tint(AnthropicTheme.terracotta)
             .controlSize(.mini)
 
             Text("· 仅组件中文，Claude 锁纯英")
-                .font(.system(size: 10.5))
-                .foregroundStyle(.tertiary)
+                .font(AnthropicFont.sans(size: 10.5, weight: .regular))
+                .foregroundStyle(AnthropicTheme.inkMuted)
                 .lineLimit(1)
 
             Spacer()
@@ -1206,12 +1526,12 @@ struct SwitcherPopoverView: View {
                 store.refreshAll()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(refreshHovered ? .primary : .secondary)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(refreshHovered ? AnthropicTheme.inkPrimary : AnthropicTheme.inkSecondary)
                     .frame(width: 24, height: 22)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(refreshHovered ? 0.08 : 0.0))
+                            .fill(refreshHovered ? AnthropicTheme.controlFill : Color.clear)
                     )
             }
             .buttonStyle(.plain)
@@ -1222,13 +1542,13 @@ struct SwitcherPopoverView: View {
                 NSApplication.shared.terminate(nil)
             } label: {
                 Text("退出")
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(quitHovered ? .primary : .secondary)
-                    .padding(.horizontal, 7)
+                    .font(AnthropicFont.sans(size: 11.5, weight: .medium))
+                    .foregroundStyle(quitHovered ? AnthropicTheme.inkPrimary : AnthropicTheme.inkSecondary)
+                    .padding(.horizontal, 7.5)
                     .frame(height: 22)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Color.primary.opacity(quitHovered ? 0.08 : 0.0))
+                            .fill(quitHovered ? AnthropicTheme.controlFill : Color.clear)
                     )
             }
             .buttonStyle(.plain)
@@ -1258,53 +1578,64 @@ struct AccountCardView: View {
         let isHighlighted = isCLIActive || isDesktopOpen
 
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .center, spacing: 10.5) {
                 ZStack(alignment: .bottomTrailing) {
-                    Text(account.shortBadge)
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(width: 34, height: 34)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(account.badgeGradient)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .strokeBorder(Color.white.opacity(0.24), lineWidth: 0.8)
-                                )
-                                .shadow(color: account.accentColor.opacity(0.25), radius: 4, x: 0, y: 2)
-                        )
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 9.5, style: .continuous)
+                            .fill(account.badgeGradient)
+                            .overlay(
+                                ClaudeStarburstShape()
+                                    .fill(Color.white.opacity(0.14))
+                                    .frame(width: 24, height: 24)
+                                    .offset(x: 6, y: -5)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 9.5, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 9.5, style: .continuous)
+                                    .strokeBorder(Color.white.opacity(0.22), lineWidth: 0.75)
+                            )
+
+                        Text(account.shortBadge)
+                            .font(AnthropicFont.serif(size: 13.5, weight: .bold))
+                            .foregroundStyle(Color(red: 0.980, green: 0.976, blue: 0.961))
+                    }
+                    .frame(width: 35, height: 35)
 
                     if isDesktopOpen {
                         Circle()
-                            .fill(Color(red: 0.10, green: 0.78, blue: 0.48))
+                            .fill(AnthropicTheme.sage)
                             .frame(width: 9.5, height: 9.5)
                             .overlay(
                                 Circle()
-                                    .strokeBorder(Color(nsColor: .windowBackgroundColor), lineWidth: 1.6)
+                                    .strokeBorder(AnthropicTheme.cardSurface, lineWidth: 1.6)
                             )
-                            .offset(x: 2.5, y: 2.5)
+                            .offset(x: 2, y: 2)
                     }
                 }
 
                 VStack(alignment: .leading, spacing: 2.5) {
                     HStack(spacing: 6) {
                         Text(account.defaultTitle)
-                            .font(.system(size: 13.5, weight: .bold))
-                            .foregroundStyle(.primary)
+                            .font(AnthropicFont.serif(size: 14.5, weight: .semibold))
+                            .foregroundStyle(AnthropicTheme.inkPrimary)
 
                         if isCLIActive {
-                            HStack(spacing: 3) {
+                            HStack(spacing: 3.5) {
                                 Image(systemName: "terminal.fill")
-                                    .font(.system(size: 8.5, weight: .bold))
+                                    .font(.system(size: 8, weight: .bold))
                                 Text("终端默认")
-                                    .font(.system(size: 10, weight: .semibold))
+                                    .font(AnthropicFont.sans(size: 10, weight: .semibold))
                             }
                             .foregroundStyle(account.accentColor)
-                            .padding(.horizontal, 6)
+                            .padding(.horizontal, 6.5)
                             .padding(.vertical, 2)
                             .background(
                                 Capsule()
-                                    .fill(account.accentColor.opacity(0.14))
+                                    .fill(account.accentColor.opacity(0.13))
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(account.accentColor.opacity(0.28), lineWidth: 0.7)
+                                    )
                             )
                         }
                     }
@@ -1314,7 +1645,7 @@ struct AccountCardView: View {
                             TextField("输入账号备注（如：主力号 / 写代码专用）", text: $store.editingNoteDraft)
                                 .textFieldStyle(.roundedBorder)
                                 .controlSize(.small)
-                                .font(.system(size: 11))
+                                .font(AnthropicFont.sans(size: 11))
                                 .onSubmit {
                                     store.saveEditingNote()
                                 }
@@ -1329,12 +1660,12 @@ struct AccountCardView: View {
                         } label: {
                             HStack(spacing: 4) {
                                 Text(store.note(for: account))
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
+                                    .font(AnthropicFont.sans(size: 11, weight: .regular))
+                                    .foregroundStyle(AnthropicTheme.inkMuted)
                                     .lineLimit(1)
                                 Image(systemName: "square.and.pencil")
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(.tertiary)
+                                    .font(.system(size: 9.5))
+                                    .foregroundStyle(AnthropicTheme.inkMuted.opacity(0.75))
                             }
                         }
                         .buttonStyle(.plain)
@@ -1347,32 +1678,36 @@ struct AccountCardView: View {
                 if let runningPID = pid {
                     HStack(spacing: 4.5) {
                         Circle()
-                            .fill(Color(red: 0.08, green: 0.75, blue: 0.48))
-                            .frame(width: 6, height: 6)
+                            .fill(AnthropicTheme.sage)
+                            .frame(width: 5.5, height: 5.5)
                         Text("桌面运行中")
-                            .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundStyle(Color(red: 0.05, green: 0.62, blue: 0.42))
+                            .font(AnthropicFont.sans(size: 10.5, weight: .semibold))
+                            .foregroundStyle(AnthropicTheme.sage)
                     }
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
                     .background(
                         Capsule()
-                            .fill(Color.green.opacity(0.12))
+                            .fill(AnthropicTheme.sageFill)
                             .overlay(
                                 Capsule()
-                                    .strokeBorder(Color.green.opacity(0.24), lineWidth: 0.8)
+                                    .strokeBorder(AnthropicTheme.sageBorder, lineWidth: 0.75)
                             )
                     )
                     .help("受保护桌面进程正在运行（PID \(runningPID) · \(store.envConfig.targetTimeZone) · 纯英文）")
                 } else {
                     Text("桌面未启动")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.tertiary)
+                        .font(AnthropicFont.sans(size: 10.5, weight: .medium))
+                        .foregroundStyle(AnthropicTheme.inkMuted)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
                         .background(
                             Capsule()
-                                .fill(Color.primary.opacity(0.04))
+                                .fill(AnthropicTheme.recessedSurface)
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(AnthropicTheme.borderSubtle, lineWidth: 0.7)
+                                )
                         )
                 }
             }
@@ -1383,18 +1718,18 @@ struct AccountCardView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "hourglass.bottomhalf.filled")
                             .font(.system(size: 10.5, weight: .semibold))
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(AnthropicTheme.terracotta)
                         Text("额度恢复倒计时")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.secondary)
+                            .font(AnthropicFont.sans(size: 11, weight: .medium))
+                            .foregroundStyle(AnthropicTheme.inkSecondary)
                         Text(store.formatDuration(remaining))
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                            .font(AnthropicFont.mono(size: 11.5, weight: .bold))
                             .monospacedDigit()
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(AnthropicTheme.terracotta)
 
                         Text("(\(store.cooldownReadyTimeText(for: account)) 恢复)")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.tertiary)
+                            .font(AnthropicFont.sans(size: 10.5))
+                            .foregroundStyle(AnthropicTheme.inkMuted)
 
                         Spacer()
 
@@ -1402,19 +1737,19 @@ struct AccountCardView: View {
                             store.clearCooldown(for: account)
                         }
                         .buttonStyle(.plain)
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(.secondary)
+                        .font(AnthropicFont.sans(size: 10.5, weight: .medium))
+                        .foregroundStyle(AnthropicTheme.inkSecondary)
                     }
 
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             Capsule()
-                                .fill(Color.orange.opacity(0.16))
+                                .fill(AnthropicTheme.terracotta.opacity(0.15))
                                 .frame(height: 4.5)
                             Capsule()
                                 .fill(
                                     LinearGradient(
-                                        colors: [Color.orange, account.accentColor],
+                                        colors: [AnthropicTheme.terracotta, AnthropicTheme.terracottaDeep],
                                         startPoint: .leading,
                                         endPoint: .trailing
                                     )
@@ -1427,11 +1762,11 @@ struct AccountCardView: View {
                 .padding(.horizontal, 9.5)
                 .padding(.vertical, 7.5)
                 .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(Color.orange.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 8.5, style: .continuous)
+                        .fill(AnthropicTheme.terracotta.opacity(0.08))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .strokeBorder(Color.orange.opacity(0.22), lineWidth: 0.8)
+                            RoundedRectangle(cornerRadius: 8.5, style: .continuous)
+                                .strokeBorder(AnthropicTheme.terracotta.opacity(0.24), lineWidth: 0.75)
                         )
                 )
             }
@@ -1440,8 +1775,8 @@ struct AccountCardView: View {
                 PrimaryCapsuleButton(
                     title: primaryActionTitle(isDesktopOpen: isDesktopOpen, isOtherDesktopOpen: isOtherDesktopOpen),
                     icon: primaryActionIcon(isDesktopOpen: isDesktopOpen, isOtherDesktopOpen: isOtherDesktopOpen),
-                    gradient: account.badgeGradient,
-                    accent: account.accentColor,
+                    gradient: account.primaryButtonGradient,
+                    accent: AnthropicTheme.terracotta,
                     disabled: store.isBusy
                 ) {
                     store.launchOrSwitchDesktop(to: account, closeOther: true)
@@ -1498,22 +1833,22 @@ struct AccountCardView: View {
                 } label: {
                     Image(systemName: cooldown == nil ? "clock.badge" : "timer")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(cooldown == nil ? Color.secondary : Color.orange)
+                        .foregroundStyle(cooldown == nil ? AnthropicTheme.inkSecondary : AnthropicTheme.terracotta)
                         .frame(width: 30, height: 30)
                         .background(
-                            RoundedRectangle(cornerRadius: 8.5, style: .continuous)
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
                                 .fill(
                                     cooldown != nil
-                                        ? Color.orange.opacity(0.14)
-                                        : Color.primary.opacity(timerHovered ? 0.10 : 0.055)
+                                        ? AnthropicTheme.terracotta.opacity(0.14)
+                                        : (timerHovered ? AnthropicTheme.controlHoverFill : AnthropicTheme.controlFill)
                                 )
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 8.5, style: .continuous)
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                                         .strokeBorder(
                                             cooldown != nil
-                                                ? Color.orange.opacity(0.32)
-                                                : Color.primary.opacity(0.09),
-                                            lineWidth: 0.8
+                                                ? AnthropicTheme.terracotta.opacity(0.32)
+                                                : (timerHovered ? AnthropicTheme.borderStrong : AnthropicTheme.borderSubtle),
+                                            lineWidth: 0.75
                                         )
                                 )
                         )
@@ -1527,26 +1862,24 @@ struct AccountCardView: View {
         }
         .padding(12)
         .background(
-            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                .fill(
-                    isHighlighted
-                        ? account.accentColor.opacity(cardHovered ? 0.085 : 0.065)
-                        : Color.primary.opacity(cardHovered ? 0.048 : 0.03)
-                )
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isHighlighted ? AnthropicTheme.cardElevatedSurface : AnthropicTheme.cardSurface)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 13, style: .continuous)
-                        .strokeBorder(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(
                             isHighlighted
-                                ? account.accentColor.opacity(cardHovered ? 0.55 : 0.42)
-                                : Color.primary.opacity(cardHovered ? 0.15 : 0.08),
-                            lineWidth: isHighlighted ? 1.25 : 1.0
+                                ? account.accentColor.opacity(cardHovered ? 0.055 : 0.038)
+                                : Color.clear
                         )
                 )
-                .shadow(
-                    color: isHighlighted ? account.accentColor.opacity(0.08) : Color.clear,
-                    radius: 8,
-                    x: 0,
-                    y: 2
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(
+                            isHighlighted
+                                ? account.accentColor.opacity(cardHovered ? 0.56 : 0.42)
+                                : (cardHovered ? AnthropicTheme.borderStrong : AnthropicTheme.borderSubtle),
+                            lineWidth: isHighlighted ? 1.15 : 0.85
+                        )
                 )
         )
         .onHover { hovering in
@@ -1573,7 +1906,7 @@ struct AccountCardView: View {
     }
 }
 
-// MARK: - Cached Menu Bar Status Pill Renderer
+// MARK: - Cached Menu Bar Status Pill Renderer (Anthropic Starburst Capsule)
 
 private struct MenuBarCapsuleKey: Equatable {
     let healthy: Bool
@@ -1611,10 +1944,10 @@ enum MenuBarCapsuleRenderer {
         let textSize = (title as NSString).size(withAttributes: measureAttrs)
 
         let dualDots = healthy && p1Running && p2Running
-        let dotAreaWidth: CGFloat = dualDots ? 18.5 : 12.0
-        let leftPad: CGFloat = 7.5
+        let iconAreaWidth: CGFloat = dualDots ? 21.0 : 15.0
+        let leftPad: CGFloat = 7.0
         let rightPad: CGFloat = 8.0
-        let totalWidth = ceil(leftPad + dotAreaWidth + textSize.width + rightPad)
+        let totalWidth = ceil(leftPad + iconAreaWidth + textSize.width + rightPad)
         let totalHeight: CGFloat = 20.0
 
         let img = NSImage(size: NSSize(width: totalWidth, height: totalHeight), flipped: false) { rect in
@@ -1622,9 +1955,9 @@ enum MenuBarCapsuleRenderer {
             let pillPath = NSBezierPath(roundedRect: pillRect, xRadius: pillRect.height / 2.0, yRadius: pillRect.height / 2.0)
 
             if healthy {
-                NSColor.labelColor.withAlphaComponent(0.08).setFill()
+                AnthropicTheme.nsTerracotta.withAlphaComponent(0.11).setFill()
                 pillPath.fill()
-                NSColor.labelColor.withAlphaComponent(0.16).setStroke()
+                AnthropicTheme.nsTerracotta.withAlphaComponent(0.28).setStroke()
                 pillPath.lineWidth = 0.8
                 pillPath.stroke()
             } else {
@@ -1636,46 +1969,29 @@ enum MenuBarCapsuleRenderer {
             }
 
             let centerY = rect.midY
-            let dotSize: CGFloat = 7.0
+            let starSize: CGFloat = 11.0
 
             if !healthy {
-                let haloRect = NSRect(x: leftPad - 1.5, y: centerY - (dotSize + 3.0) / 2.0, width: dotSize + 3.0, height: dotSize + 3.0)
-                NSColor.systemRed.withAlphaComponent(0.28).setFill()
-                NSBezierPath(ovalIn: haloRect).fill()
-
-                let dotRect = NSRect(x: leftPad, y: centerY - dotSize / 2.0, width: dotSize, height: dotSize)
-                NSColor.systemRed.setFill()
-                NSBezierPath(ovalIn: dotRect).fill()
+                let starRect = NSRect(x: leftPad, y: centerY - starSize / 2.0, width: starSize, height: starSize)
+                ClaudeStarburstShape.drawInAppKit(rect: starRect, color: NSColor.systemRed)
             } else if dualDots {
-                let r1 = NSRect(x: leftPad, y: centerY - dotSize / 2.0, width: dotSize, height: dotSize)
-                AccountID.pro1.nsAccentColor.setFill()
-                NSBezierPath(ovalIn: r1).fill()
+                let starRect = NSRect(x: leftPad, y: centerY - starSize / 2.0, width: starSize, height: starSize)
+                ClaudeStarburstShape.drawInAppKit(rect: starRect, color: AccountID.pro1.nsAccentColor)
 
-                let r2 = NSRect(x: leftPad + 6.2, y: centerY - dotSize / 2.0, width: dotSize, height: dotSize)
+                let dotSize: CGFloat = 6.2
+                let r2 = NSRect(x: leftPad + 11.2, y: centerY - dotSize / 2.0, width: dotSize, height: dotSize)
                 AccountID.pro2.nsAccentColor.setFill()
-                let p2Path = NSBezierPath(ovalIn: r2)
-                p2Path.fill()
-                NSColor.windowBackgroundColor.withAlphaComponent(0.75).setStroke()
-                p2Path.lineWidth = 0.9
-                p2Path.stroke()
+                NSBezierPath(ovalIn: r2).fill()
             } else if p1Running || p2Running {
                 let activeColor = p1Running ? AccountID.pro1.nsAccentColor : AccountID.pro2.nsAccentColor
-                let haloRect = NSRect(x: leftPad - 1.6, y: centerY - (dotSize + 3.2) / 2.0, width: dotSize + 3.2, height: dotSize + 3.2)
-                activeColor.withAlphaComponent(0.24).setFill()
-                NSBezierPath(ovalIn: haloRect).fill()
-
-                let dotRect = NSRect(x: leftPad, y: centerY - dotSize / 2.0, width: dotSize, height: dotSize)
-                activeColor.setFill()
-                NSBezierPath(ovalIn: dotRect).fill()
+                let starRect = NSRect(x: leftPad, y: centerY - starSize / 2.0, width: starSize, height: starSize)
+                ClaudeStarburstShape.drawInAppKit(rect: starRect, color: activeColor)
             } else {
-                let ringSize: CGFloat = 6.6
-                let ringRect = NSRect(x: leftPad + 0.2, y: centerY - ringSize / 2.0, width: ringSize, height: ringSize)
-                let ringPath = NSBezierPath(ovalIn: ringRect)
-                activeCLI.nsAccentColor.withAlphaComponent(0.20).setFill()
-                ringPath.fill()
-                activeCLI.nsAccentColor.setStroke()
-                ringPath.lineWidth = 1.6
-                ringPath.stroke()
+                let starRect = NSRect(x: leftPad, y: centerY - starSize / 2.0, width: starSize, height: starSize)
+                ClaudeStarburstShape.drawInAppKit(
+                    rect: starRect,
+                    color: activeCLI.nsAccentColor.withAlphaComponent(0.85)
+                )
             }
 
             let drawAttrs: [NSAttributedString.Key: Any] = [
@@ -1683,7 +1999,7 @@ enum MenuBarCapsuleRenderer {
                 .foregroundColor: healthy ? NSColor.labelColor : NSColor.systemRed
             ]
             let textOrigin = NSPoint(
-                x: leftPad + dotAreaWidth,
+                x: leftPad + iconAreaWidth,
                 y: floor((totalHeight - textSize.height) / 2.0) + 0.5
             )
             (title as NSString).draw(at: textOrigin, withAttributes: drawAttrs)
